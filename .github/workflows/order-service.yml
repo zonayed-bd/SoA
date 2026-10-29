@@ -118,7 +118,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      ORDER_IMAGE: ${{ env.IMAGE }}
+      # docker compose runs the image under test instead of building Order again
+      ORDER_IMAGE: ghcr.io/${{ github.repository_owner }}/maltashop-order:${{ github.sha }}
       ORDER_VERSION: ${{ github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
