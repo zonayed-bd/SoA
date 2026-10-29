@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Multi-stage build. Dependencies are installed in a throwaway stage; the runtime
 # image receives only production node_modules and the source code.
-ARG NODE_IMAGE=node:24.11.1-alpine3.22
+ARG NODE_IMAGE=node:24.22.2-alpine3.24
 
 # ---- Stage 1: install production dependencies (cached until the lock file changes)
 FROM ${NODE_IMAGE} AS deps
