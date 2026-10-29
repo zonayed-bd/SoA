@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS saga_log (
   order_id uuid        NOT NULL REFERENCES orders(id),
   step     text        NOT NULL,
   detail   jsonb,
-  at       timestamptz NOT NULL DEFAULT now()
+  at       timestamptz NOT NULL DEFAULT clock_timestamp()
 );
 
 ${OUTBOX_DDL}

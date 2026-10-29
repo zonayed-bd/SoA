@@ -4,6 +4,7 @@
 // server with correlation IDs and health endpoints, and graceful shutdown.
 const { randomUUID } = require('node:crypto');
 const Fastify = require('fastify');
+const { LogController } = require('fastify');
 const { Pool } = require('pg');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -36,9 +37,10 @@ async function createPool({ connectionString, log, schemaSql }) {
 function createHttpServer({ log, readinessChecks }) {
   const app = Fastify({
     loggerInstance: log,
-    disableRequestLogging: true,
+    // Request logging is done in onResponse below, in the MaltaShop log schema.
+    logController: new LogController({ disableRequestLogging: true, requestIdLogLabel: 'correlation_id' }),
+    // Reuse the caller's X-Correlation-ID, or start a new one at the edge.
     requestIdHeader: 'x-correlation-id',
-    requestIdLogLabel: 'correlation_id',
     genReqId: () => randomUUID(),
   });
 

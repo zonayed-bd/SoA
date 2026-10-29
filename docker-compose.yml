@@ -1,0 +1,130 @@
+# MaltaShop place-order prototype: `docker compose up --build` starts everything.
+# Four services, each with its own PostgreSQL database, plus RabbitMQ.
+# Only the Order API (standing in for the API gateway) and the RabbitMQ
+# management UI are published, and only on 127.0.0.1.
+name: maltashop
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [/tmp]
+  networks: [backend]
+  deploy:
+    resources:
+      limits: { cpus: "0.50", memory: 256M }
+
+x-common-env: &common-env
+  APP_ENV: local
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  AMQP_URL: amqp://${RABBITMQ_USER:-maltashop}:${RABBITMQ_PASSWORD:-maltashop-dev}@rabbitmq:5672
+
+x-db-defaults: &db-defaults
+  image: postgres:17.6-alpine3.22
+  restart: unless-stopped
+  networks: [backend]
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+    interval: 5s
+    timeout: 3s
+    retries: 20
+
+services:
+  rabbitmq:
+    image: rabbitmq:4.1.8-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-maltashop}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-maltashop-dev}
+    ports: ["127.0.0.1:15672:15672"]
+    volumes: [rabbitmq-data:/var/lib/rabbitmq]
+    networks: [edge, backend]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  order-db:
+    <<: *db-defaults
+    environment: { POSTGRES_DB: orders, POSTGRES_USER: order_svc, POSTGRES_PASSWORD: "${ORDER_DB_PASSWORD:-order-dev}" }
+    volumes: [order-db-data:/var/lib/postgresql/data]
+
+  inventory-db:
+    <<: *db-defaults
+    environment: { POSTGRES_DB: inventory, POSTGRES_USER: inventory_svc, POSTGRES_PASSWORD: "${INVENTORY_DB_PASSWORD:-inventory-dev}" }
+    volumes: [inventory-db-data:/var/lib/postgresql/data]
+
+  payment-db:
+    <<: *db-defaults
+    environment: { POSTGRES_DB: payments, POSTGRES_USER: payment_svc, POSTGRES_PASSWORD: "${PAYMENT_DB_PASSWORD:-payment-dev}" }
+    volumes: [payment-db-data:/var/lib/postgresql/data]
+
+  notification-db:
+    <<: *db-defaults
+    environment: { POSTGRES_DB: notifications, POSTGRES_USER: notification_svc, POSTGRES_PASSWORD: "${NOTIFICATION_DB_PASSWORD:-notification-dev}" }
+    volumes: [notification-db-data:/var/lib/postgresql/data]
+
+  order-service:
+    <<: *service-defaults
+    build: ./services/order
+    image: ${ORDER_IMAGE:-maltashop/order-service:local}
+    environment:
+      <<: *common-env
+      SERVICE_VERSION: ${ORDER_VERSION:-local}
+      DATABASE_URL: postgres://order_svc:${ORDER_DB_PASSWORD:-order-dev}@order-db:5432/orders
+    ports: ["127.0.0.1:${ORDER_HOST_PORT:-8080}:3000"]
+    networks: [edge, backend]
+    depends_on:
+      order-db: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  inventory-service:
+    <<: *service-defaults
+    build: ./services/inventory
+    image: maltashop/inventory-service:local
+    environment:
+      <<: *common-env
+      SERVICE_VERSION: local
+      DATABASE_URL: postgres://inventory_svc:${INVENTORY_DB_PASSWORD:-inventory-dev}@inventory-db:5432/inventory
+    depends_on:
+      inventory-db: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  payment-service:
+    <<: *service-defaults
+    build: ./services/payment
+    image: maltashop/payment-service:local
+    environment:
+      <<: *common-env
+      SERVICE_VERSION: local
+      DATABASE_URL: postgres://payment_svc:${PAYMENT_DB_PASSWORD:-payment-dev}@payment-db:5432/payments
+      PSP_TIMEOUT_MS: ${PSP_TIMEOUT_MS:-2000}
+      PSP_PRIMARY_SIMULATE_OUTAGE: ${PSP_PRIMARY_SIMULATE_OUTAGE:-false}
+    depends_on:
+      payment-db: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  notification-service:
+    <<: *service-defaults
+    build: ./services/notification
+    image: maltashop/notification-service:local
+    environment:
+      <<: *common-env
+      SERVICE_VERSION: local
+      DATABASE_URL: postgres://notification_svc:${NOTIFICATION_DB_PASSWORD:-notification-dev}@notification-db:5432/notifications
+    depends_on:
+      notification-db: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+networks:
+  edge: {}
+  backend:
+    internal: true
+
+volumes:
+  rabbitmq-data:
+  order-db-data:
+  inventory-db-data:
+  payment-db-data:
+  notification-db-data:

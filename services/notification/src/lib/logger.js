@@ -13,6 +13,8 @@ function createLogger({ service, version, env, level }) {
     base: { service, version, env },
     timestamp: () => `,"timestamp":"${new Date().toISOString()}"`,
     formatters: { level: (label) => ({ level: label }) },
+    // `event` is mandatory; lines from libraries that do not set one get a default.
+    mixin: () => ({ event: 'app.log' }),
     redact: {
       paths: ['email', '*.email', 'paymentToken', '*.paymentToken', 'req.headers.authorization'],
       censor: '[REDACTED]',
