@@ -103,4 +103,4 @@ function startRelay({ pool, broker, log, intervalMs = 250, batchSize = 50 }) {
   };
 }
 
-module.exports = { OUTBOX_DDL, enqueue, startRelay };
+module.exports = { OUTBOX_DDL, buildEnvelope, enqueue, startRelay };
