@@ -39,7 +39,7 @@ function createHandler({ pool, gateway, config }) {
     let result;
     if (rows[0].status === 'PENDING') {
       // Step 2: provider call (timeout + circuit breaker + failover).
-      result = await gateway.authorise({ idempotencyKey: `order-${orderId}`, amountCents, currency, token: paymentToken });
+      result = await gateway.authorise({ idempotencyKey: `order-${orderId}`, amountCents, currency, token: paymentToken, log });
     } else {
       // Already decided by an earlier command: re-send the same answer.
       result = {

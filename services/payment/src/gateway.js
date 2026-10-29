@@ -15,7 +15,7 @@ function createPaymentGateway({ primary, secondary, timeoutMs, log }) {
     resetTimeout: 30_000,
   });
   breaker.fallback((request) => {
-    log.warn({ event: 'psp.failover', from: primary.name, to: secondary.name }, 'primary provider unavailable, using secondary');
+    (request.log || log).warn({ event: 'psp.failover', from: primary.name, to: secondary.name }, 'primary provider unavailable, using secondary');
     return secondary.authorise(request);
   });
   breaker.on('open', () => log.warn({ event: 'psp.circuit.open', provider: primary.name }, 'circuit opened'));

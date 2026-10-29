@@ -1,0 +1,10 @@
+# Each service has one owning team that reviews every change to it.
+# (GitHub team names are illustrative for the prototype.)
+/services/order/          @maltashop/team-checkout
+/services/inventory/      @maltashop/team-checkout
+/services/payment/        @maltashop/team-checkout
+/services/notification/   @maltashop/team-engagement
+/contracts/               @maltashop/team-checkout @maltashop/team-engagement
+/chassis/                 @maltashop/team-platform
+/.github/                 @maltashop/team-platform
+/docker-compose.yml       @maltashop/team-platform
