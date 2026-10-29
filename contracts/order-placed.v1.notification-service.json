@@ -1,0 +1,64 @@
+{
+  "contract": "order.placed.v1",
+  "consumer": "notification-service",
+  "provider": "order-service",
+  "routingKey": "evt.order.placed",
+  "description": "The fields the Notification service relies on to send the 'order received' email. Written and owned by the consumer; verified by the provider's pipeline on every change. The consumer is a tolerant reader: extra fields are allowed.",
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["specversion", "id", "type", "source", "time", "correlationid", "data"],
+    "properties": {
+      "specversion": { "const": "1.0" },
+      "id": { "type": "string", "format": "uuid" },
+      "type": { "const": "order.placed.v1" },
+      "source": { "const": "order-service" },
+      "time": { "type": "string", "format": "date-time" },
+      "correlationid": { "type": "string", "minLength": 1 },
+      "data": {
+        "type": "object",
+        "required": ["orderId", "customerId", "items", "totalCents", "currency"],
+        "properties": {
+          "orderId": { "type": "string", "format": "uuid" },
+          "customerId": { "type": "string", "minLength": 1 },
+          "totalCents": { "type": "integer", "minimum": 0 },
+          "currency": { "const": "EUR" },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["sku", "quantity"],
+              "properties": {
+                "sku": { "type": "string" },
+                "quantity": { "type": "integer", "minimum": 1 }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "example": {
+    "specversion": "1.0",
+    "id": "0d6f4a52-5b0e-4f7c-9c51-2f3b7e1a9b10",
+    "type": "order.placed.v1",
+    "source": "order-service",
+    "subject": "6f1c2a8e-1111-4c3b-9d7e-000000000001",
+    "time": "2026-10-30T10:00:00.000Z",
+    "correlationid": "b7d3c0de-4e6a-4f1b-8a8e-3c2d1e0f9a77",
+    "datacontenttype": "application/json",
+    "data": {
+      "orderId": "6f1c2a8e-1111-4c3b-9d7e-000000000001",
+      "customerId": "cust-1001",
+      "items": [
+        { "sku": "SKU-KETTLE-17", "quantity": 2, "unitPriceCents": 2999 },
+        { "sku": "SKU-AIRFRYER-5L", "quantity": 1, "unitPriceCents": 8999 }
+      ],
+      "totalCents": 14997,
+      "vatCents": 2288,
+      "currency": "EUR",
+      "placedAt": "2026-10-30T10:00:00.000Z"
+    }
+  }
+}
