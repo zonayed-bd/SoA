@@ -74,6 +74,10 @@ jobs:
     name: "1b · Secret scan"
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    # gitleaks lists a pull request's commits through the API on PR events
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

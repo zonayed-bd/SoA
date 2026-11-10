@@ -1,0 +1,135 @@
+openapi: 3.1.0
+info:
+  title: MaltaShop Order API
+  version: 1.0.0
+  description: |
+    Contract-first description of the Order service's public API. Changes are
+    additive within v1; a breaking change becomes /v2 and v1 is kept for six months.
+    Placing an order starts an asynchronous saga, so POST returns 202 Accepted and
+    the client follows the `Location` header to see the final status.
+servers:
+  - url: http://localhost:8080
+paths:
+  /v1/orders:
+    post:
+      operationId: placeOrder
+      summary: Place an order and start the place-order saga
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Unique per checkout attempt. A retry with the same key and body returns the original order.
+          schema: { type: string, minLength: 8, maxLength: 128 }
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlaceOrderRequest" }
+      responses:
+        "202":
+          description: Accepted; the order is PENDING and the saga is running.
+          headers:
+            Location: { schema: { type: string }, description: URL of the new order }
+            Idempotent-Replayed: { schema: { type: boolean }, description: true when this is a replayed response }
+            X-Correlation-ID: { $ref: "#/components/headers/CorrelationId" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+  /v1/orders/{orderId}:
+    get:
+      operationId: getOrder
+      summary: Get an order, its status and its saga history
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: The order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "404": { $ref: "#/components/responses/Error" }
+components:
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      description: Propagated to every log line and message; generated at the edge if absent.
+      schema: { type: string, maxLength: 128 }
+  headers:
+    CorrelationId:
+      schema: { type: string }
+  responses:
+    Error:
+      description: Error in the standard MaltaShop shape
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    PlaceOrderRequest:
+      type: object
+      additionalProperties: false
+      required: [customerId, items, paymentToken]
+      properties:
+        customerId: { type: string, maxLength: 64 }
+        paymentToken:
+          type: string
+          description: Token from the payment provider's hosted fields. Card data never reaches MaltaShop.
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required: [sku, quantity]
+            properties:
+              sku: { type: string }
+              quantity: { type: integer, minimum: 1, maximum: 20 }
+    Order:
+      type: object
+      required: [orderId, customerId, status, items, totalCents, vatCents, currency, saga, links]
+      properties:
+        orderId: { type: string, format: uuid }
+        customerId: { type: string }
+        status: { type: string, enum: [PENDING, AWAITING_PAYMENT, CONFIRMED, REJECTED] }
+        reason: { type: string, enum: [OUT_OF_STOCK, PAYMENT_DECLINED] }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              sku: { type: string }
+              quantity: { type: integer }
+              unitPriceCents: { type: integer, description: VAT-inclusive price in euro cents }
+        totalCents: { type: integer, description: VAT-inclusive total in euro cents }
+        vatCents: { type: integer, description: Maltese VAT (18%) contained in the total }
+        currency: { type: string, enum: [EUR] }
+        createdAt: { type: string, format: date-time }
+        saga:
+          type: array
+          items:
+            type: object
+            properties:
+              step: { type: string }
+              at: { type: string, format: date-time }
+        links:
+          type: object
+          properties:
+            self: { type: string }
+    Error:
+      type: object
+      required: [status, code, message, correlationId]
+      properties:
+        status: { type: integer }
+        code: { type: string, examples: [VALIDATION_FAILED, IDEMPOTENCY_KEY_REUSED, UNKNOWN_SKU, ORDER_NOT_FOUND] }
+        message: { type: string }
+        correlationId: { type: string }
